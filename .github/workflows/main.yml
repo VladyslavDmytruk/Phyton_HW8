@@ -1,0 +1,65 @@
+name: Python CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize]
+  workflow_dispatch:
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Python 3.x
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+
+    - name: Install software
+      run: |
+        sudo apt update
+        sudo apt install python3-flask python3-flask-restful python3-flask-cors python3-peewee -y
+
+    - name: Install dependencies
+      run: |
+        cd $GITHUB_WORKSPACE
+        python3 -m pip install --upgrade pip
+        python3 -m pip install -r requirements.txt
+
+    - name: Set up database
+      run: |
+        cd $GITHUB_WORKSPACE
+        python3 db.py --delete_all_data --add_default_data --print_all_data
+
+    - name: Run API
+      run: |
+        cd $GITHUB_WORKSPACE
+        python3 app.py --host localhost --port 5000 &
+
+    - name: Run unit tests
+      run: |
+        echo "No tests"
+
+  update_and_test:
+    needs: [build]
+    if: github.event_name == 'pull_request' && github.event.action == 'opened'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Update project code
+      run: |
+        git checkout -b update_branch
+        git commit -am "Update project code"
+        git push origin update_branch
+
+    - name: Create pull request
+      uses: peter-evans/create-pull-request@v3
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        commit-message: 'Update project code'
